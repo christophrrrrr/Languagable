@@ -1,36 +1,47 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { folders, type Folder } from "@/lib/db/schema";
+import type { Language } from "@/lib/lang";
 
-function revalidateTarjetas() {
-  revalidatePath("/tarjetas");
-  revalidatePath("/");
+function revalidateCards() {
+  revalidatePath("/", "layout");
 }
 
-export async function listFolders(): Promise<Folder[]> {
-  return getDb().select().from(folders).orderBy(asc(folders.name));
+export async function listFolders(lang: Language): Promise<Folder[]> {
+  return getDb()
+    .select()
+    .from(folders)
+    .where(eq(folders.language, lang))
+    .orderBy(asc(folders.name));
 }
 
-/** Create a folder; if the name already exists, return the existing one. */
-export async function createFolder(name: string): Promise<Folder | null> {
+/** Create a folder; if the name already exists in this language, return the existing one. */
+export async function createFolder(
+  lang: Language,
+  name: string,
+): Promise<Folder | null> {
   const trimmed = name.trim();
   if (!trimmed) return null;
 
   const db = getDb();
   const [created] = await db
     .insert(folders)
-    .values({ name: trimmed })
-    .onConflictDoNothing({ target: folders.name })
+    .values({ language: lang, name: trimmed })
+    .onConflictDoNothing({ target: [folders.language, folders.name] })
     .returning();
   const folder =
     created ??
     (
-      await db.select().from(folders).where(eq(folders.name, trimmed)).limit(1)
+      await db
+        .select()
+        .from(folders)
+        .where(and(eq(folders.language, lang), eq(folders.name, trimmed)))
+        .limit(1)
     )[0];
-  revalidateTarjetas();
+  revalidateCards();
   return folder ?? null;
 }
 
@@ -45,11 +56,11 @@ export async function renameFolder(id: string, name: string) {
   } catch {
     // Duplicate name — keep the old one.
   }
-  revalidateTarjetas();
+  revalidateCards();
 }
 
 /** Delete a folder; its cards become unfiled (FK sets folder_id to null). */
 export async function deleteFolder(id: string) {
   await getDb().delete(folders).where(eq(folders.id, id));
-  revalidateTarjetas();
+  revalidateCards();
 }

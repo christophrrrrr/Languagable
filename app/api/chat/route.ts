@@ -1,12 +1,13 @@
 import type { ModelMessage } from "ai";
 import { streamText } from "ai";
 import { conversationModel } from "@/lib/ai/provider";
-import { conversationSystemPrompt, OPENING_PROMPT } from "@/lib/ai/prompts";
+import { conversationSystemPrompt, openingPrompt } from "@/lib/ai/prompts";
 import { getDb } from "@/lib/db/client";
 import { messages as messagesTable } from "@/lib/db/schema";
 import { getConversation, getMessages } from "@/lib/db/queries";
 import { getTopic } from "@/content/topics";
 import { isPracticeTense, tenseLabel } from "@/lib/tense";
+import { isLanguage, type Language } from "@/lib/lang";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,12 +25,13 @@ export async function POST(req: Request) {
   const convo = await getConversation(conversationId);
   if (!convo) return new Response("Conversation not found", { status: 404 });
 
-  const topic = convo.topicSlug ? getTopic(convo.topicSlug) : undefined;
+  const lang: Language = isLanguage(convo.language) ? convo.language : "es";
+  const topic = convo.topicSlug ? getTopic(lang, convo.topicSlug) : undefined;
   const focusTenseLabel =
-    convo.focusTense && isPracticeTense(convo.focusTense)
-      ? tenseLabel(convo.focusTense)
+    convo.focusTense && isPracticeTense(lang, convo.focusTense)
+      ? tenseLabel(lang, convo.focusTense)
       : null;
-  const system = conversationSystemPrompt({
+  const system = conversationSystemPrompt(lang, {
     topicSeed: topic?.seed ?? null,
     focusTenseLabel,
   });
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
     model: conversationModel(),
     system,
     ...(isOpening
-      ? { prompt: OPENING_PROMPT }
+      ? { prompt: openingPrompt(lang) }
       : { messages: modelMessages }),
     onError: (err) => {
       console.error("[chat] streamText error:", err);

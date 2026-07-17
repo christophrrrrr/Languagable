@@ -9,18 +9,25 @@ import {
   messages,
   type NewIssue,
 } from "@/lib/db/schema";
-import { getMessages } from "@/lib/db/queries";
+import { getConversation, getMessages } from "@/lib/db/queries";
 import { runAnalysisPipeline, type PipelineMessage } from "@/lib/analysis/pipeline";
 import { buildTenseOpening, isPracticeTense } from "@/lib/tense";
+import { isLanguage, type Language } from "@/lib/lang";
+
+function readLanguage(formData: FormData): Language {
+  const raw = String(formData.get("language") ?? "");
+  return isLanguage(raw) ? raw : "es";
+}
 
 /** Create a new conversation and go to it. Called from the start screen form. */
 export async function startConversation(formData: FormData) {
+  const language = readLanguage(formData);
   const raw = formData.get("topicSlug");
   const topicSlug = typeof raw === "string" && raw.length > 0 ? raw : null;
 
   const [row] = await getDb()
     .insert(conversations)
-    .values({ topicSlug })
+    .values({ language, topicSlug })
     .returning({ id: conversations.id });
 
   redirect(`/chat/${row.id}`);
@@ -28,19 +35,20 @@ export async function startConversation(formData: FormData) {
 
 /** Start a tense-practice conversation with a deterministic opening message. */
 export async function startTensePractice(formData: FormData) {
+  const language = readLanguage(formData);
   const tense = String(formData.get("tense") ?? "");
-  if (!isPracticeTense(tense)) redirect("/");
+  if (!isPracticeTense(language, tense)) redirect(`/${language}`);
 
   const db = getDb();
   const [row] = await db
     .insert(conversations)
-    .values({ topicSlug: null, focusTense: tense })
+    .values({ language, topicSlug: null, focusTense: tense })
     .returning({ id: conversations.id });
 
   await db.insert(messages).values({
     conversationId: row.id,
     role: "assistant",
-    content: buildTenseOpening(tense),
+    content: buildTenseOpening(language, tense),
     index: 0,
   });
 
@@ -51,6 +59,10 @@ export async function startTensePractice(formData: FormData) {
 export async function finishAndAnalyze(formData: FormData) {
   const conversationId = String(formData.get("conversationId") ?? "");
   if (!conversationId) redirect("/");
+
+  const convo = await getConversation(conversationId);
+  if (!convo) redirect("/");
+  const language: Language = isLanguage(convo.language) ? convo.language : "es";
 
   const rows = await getMessages(conversationId);
   const pipelineMessages: PipelineMessage[] = rows
@@ -63,6 +75,7 @@ export async function finishAndAnalyze(formData: FormData) {
     }));
 
   const { strengths, issues: prepared } = await runAnalysisPipeline(
+    language,
     pipelineMessages,
   );
 

@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNull, lte, sql } from "drizzle-orm";
+import type { Language } from "@/lib/lang";
 import { getDb } from "./client";
 import { conversations, folders, issues, messages, savedCards } from "./schema";
 
@@ -27,16 +28,21 @@ export async function getIssues(conversationId: string) {
     .orderBy(desc(issues.confidence));
 }
 
-export async function listRecentConversations(limit = 20) {
+export async function listRecentConversations(lang: Language, limit = 20) {
   return getDb()
     .select()
     .from(conversations)
+    .where(eq(conversations.language, lang))
     .orderBy(desc(conversations.startedAt))
     .limit(limit);
 }
 
-export async function getFolders() {
-  return getDb().select().from(folders).orderBy(asc(folders.name));
+export async function getFolders(lang: Language) {
+  return getDb()
+    .select()
+    .from(folders)
+    .where(eq(folders.language, lang))
+    .orderBy(asc(folders.name));
 }
 
 export async function getFolder(id: string) {
@@ -49,7 +55,7 @@ export async function getFolder(id: string) {
 }
 
 /** Card + due counts grouped by folder (folderId null = unfiled cards). */
-export async function getFolderStats() {
+export async function getFolderStats(lang: Language) {
   return getDb()
     .select({
       folderId: savedCards.folderId,
@@ -57,6 +63,7 @@ export async function getFolderStats() {
       due: sql<number>`(count(*) filter (where ${savedCards.due} <= now()))::int`,
     })
     .from(savedCards)
+    .where(eq(savedCards.language, lang))
     .groupBy(savedCards.folderId);
 }
 
@@ -71,21 +78,28 @@ function folderFilter(folderId?: string | null) {
     : eq(savedCards.folderId, folderId);
 }
 
-export async function getSavedCards(folderId?: string | null) {
+export async function getSavedCards(lang: Language, folderId?: string | null) {
   return getDb()
     .select()
     .from(savedCards)
-    .where(folderFilter(folderId))
+    .where(and(eq(savedCards.language, lang), folderFilter(folderId)))
     .orderBy(desc(savedCards.createdAt));
 }
 
 export async function getDueSavedCards(
+  lang: Language,
   now: Date = new Date(),
   folderId?: string | null,
 ) {
   return getDb()
     .select()
     .from(savedCards)
-    .where(and(lte(savedCards.due, now), folderFilter(folderId)))
+    .where(
+      and(
+        eq(savedCards.language, lang),
+        lte(savedCards.due, now),
+        folderFilter(folderId),
+      ),
+    )
     .orderBy(asc(savedCards.due));
 }
