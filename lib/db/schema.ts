@@ -85,6 +85,9 @@ export const concepts = pgTable("concepts", {
 // ----------------------------------------------------------- conversations
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  // Target language ("es" | "fr" | "pt") — see lib/lang.ts. Text (not enum) so
+  // adding a language never needs a migration.
+  language: text("language").notNull().default("es"),
   topicSlug: text("topic_slug"),
   // When set, this conversation is a tense-practice drill (a Tense slug).
   focusTense: text("focus_tense"),
@@ -270,12 +273,13 @@ export const folders = pgTable(
   "folders",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    language: text("language").notNull().default("es"),
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("folders_name_uniq").on(t.name)],
+  (t) => [uniqueIndex("folders_language_name_uniq").on(t.language, t.name)],
 );
 
 // -------------------------------------------------------------- saved cards
@@ -285,6 +289,7 @@ export const savedCards = pgTable(
   "saved_cards",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    language: text("language").notNull().default("es"),
     phrase: text("phrase").notNull(),
     meaning: text("meaning").notNull(),
     note: text("note"),
