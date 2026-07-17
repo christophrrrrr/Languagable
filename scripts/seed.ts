@@ -1,8 +1,8 @@
-// Seeds the concept taxonomy (content-as-code) into the DB.
+// Seeds the concept taxonomy (content-as-code) and starter card folders.
 // Run with: npm run seed
 import { concepts as conceptSeed } from "../content/concepts";
 import { getDb } from "../lib/db/client";
-import { concepts as conceptsTable } from "../lib/db/schema";
+import { concepts as conceptsTable, folders } from "../lib/db/schema";
 
 for (const file of [".env.local", ".env"]) {
   try {
@@ -35,6 +35,15 @@ async function main() {
       });
   }
   console.log(`Seeded ${conceptSeed.length} concepts.`);
+
+  const starterFolders = ["Dichos", "Vocabulario", "Expresiones"];
+  for (const name of starterFolders) {
+    await db
+      .insert(folders)
+      .values({ name })
+      .onConflictDoNothing({ target: folders.name });
+  }
+  console.log(`Seeded ${starterFolders.length} starter folders.`);
 }
 
 main()

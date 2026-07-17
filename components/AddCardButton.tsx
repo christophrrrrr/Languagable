@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { addSavedCard } from "@/server/saved";
+import { listFolders, createFolder } from "@/server/folders";
+
+const NEW_FOLDER = "__new__";
 
 export function AddCardButton({
   defaultPhrase,
@@ -14,6 +17,9 @@ export function AddCardButton({
   const [phrase, setPhrase] = useState("");
   const [meaning, setMeaning] = useState("");
   const [note, setNote] = useState("");
+  const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
+  const [folderId, setFolderId] = useState("");
+  const [newFolderName, setNewFolderName] = useState("");
   const [pending, start] = useTransition();
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -21,16 +27,28 @@ export function AddCardButton({
     setPhrase(defaultPhrase);
     setMeaning("");
     setNote("");
+    setNewFolderName("");
     setOpen(true);
+    void listFolders()
+      .then((rows) => setFolders(rows.map((f) => ({ id: f.id, name: f.name }))))
+      .catch(() => setFolders([]));
   };
 
   const save = () => {
     if (!phrase.trim() || !meaning.trim()) return;
     start(async () => {
+      let targetFolderId: string | null = folderId || null;
+      if (folderId === NEW_FOLDER) {
+        const created = newFolderName.trim()
+          ? await createFolder(newFolderName)
+          : null;
+        targetFolderId = created?.id ?? null;
+      }
       await addSavedCard({
         phrase,
         meaning,
         note,
+        folderId: targetFolderId,
         sourceConversationId: conversationId,
       });
       setOpen(false);
@@ -68,6 +86,29 @@ export function AddCardButton({
             className="mt-1 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20"
             placeholder="ir muy bien, sobre ruedas"
           />
+          <label className="mt-2 block text-xs opacity-60">Carpeta</label>
+          <select
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+            className="mt-1 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-ink"
+          >
+            <option value="">Sin carpeta</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+            <option value={NEW_FOLDER}>+ Nueva carpeta…</option>
+          </select>
+          {folderId === NEW_FOLDER && (
+            <input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              autoFocus
+              className="mt-1.5 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20"
+              placeholder="Nombre de la carpeta"
+            />
+          )}
           <label className="mt-2 block text-xs opacity-60">Nota (opcional)</label>
           <input
             value={note}

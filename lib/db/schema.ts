@@ -263,6 +263,21 @@ export const reviewLogs = pgTable(
   (t) => [index("review_logs_reviewed_idx").on(t.reviewedAt)],
 );
 
+// ----------------------------------------------------------------- folders
+// User-created decks for saved cards ("Dichos", "Vocabulario", …). A card
+// belongs to at most one folder; deleting a folder leaves its cards unfiled.
+export const folders = pgTable(
+  "folders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("folders_name_uniq").on(t.name)],
+);
+
 // -------------------------------------------------------------- saved cards
 // Manually-saved practice cards (things the user liked / learned). Reviewed with
 // the same FSRS flow. `meaning` is the prompt (front); `phrase` is the answer.
@@ -273,6 +288,9 @@ export const savedCards = pgTable(
     phrase: text("phrase").notNull(),
     meaning: text("meaning").notNull(),
     note: text("note"),
+    folderId: uuid("folder_id").references(() => folders.id, {
+      onDelete: "set null",
+    }),
     sourceConversationId: uuid("source_conversation_id").references(
       () => conversations.id,
       { onDelete: "set null" },
@@ -284,10 +302,15 @@ export const savedCards = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("saved_cards_due_idx").on(t.due)],
+  (t) => [
+    index("saved_cards_due_idx").on(t.due),
+    index("saved_cards_folder_idx").on(t.folderId),
+  ],
 );
 
 // ------------------------------------------------------------------- types
+export type Folder = typeof folders.$inferSelect;
+export type NewFolder = typeof folders.$inferInsert;
 export type SavedCard = typeof savedCards.$inferSelect;
 export type NewSavedCard = typeof savedCards.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;

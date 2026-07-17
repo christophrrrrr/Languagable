@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { reviewSavedCard, deleteSavedCard } from "@/server/saved";
+import {
+  reviewSavedCard,
+  deleteSavedCard,
+  moveSavedCard,
+} from "@/server/saved";
 import type { DrillRating } from "@/lib/srs";
 
 export interface SavedCardView {
@@ -11,6 +15,12 @@ export interface SavedCardView {
   meaning: string;
   note: string | null;
   state: number;
+  folderId: string | null;
+}
+
+export interface FolderOption {
+  id: string;
+  name: string;
 }
 
 const RATINGS: { key: DrillRating; label: string }[] = [
@@ -26,21 +36,37 @@ function stateLabel(state: number): string {
   return "aprendiendo";
 }
 
-export function SavedCards({
+export function FolderCards({
   cards,
   due,
+  folders,
+  autoStart = false,
 }: {
   cards: SavedCardView[];
   due: SavedCardView[];
+  folders: FolderOption[];
+  autoStart?: boolean;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"list" | "practice">("list");
+  const startPractice = autoStart && due.length > 0;
+  const [mode, setMode] = useState<"list" | "practice">(
+    startPractice ? "practice" : "list",
+  );
   const [idx, setIdx] = useState(0);
   const [revealed, setRevealed] = useState(false);
   // Snapshot of the cards to review this session — fixed at "Practicar" time so
   // it never shifts as reviews reschedule cards underneath us.
-  const [session, setSession] = useState<SavedCardView[]>([]);
+  const [session, setSession] = useState<SavedCardView[]>(
+    startPractice ? due : [],
+  );
   const [, start] = useTransition();
+
+  const beginSession = (deck: SavedCardView[]) => {
+    setSession(deck);
+    setMode("practice");
+    setIdx(0);
+    setRevealed(false);
+  };
 
   // ---- practice mode ----
   if (mode === "practice") {
@@ -120,30 +146,42 @@ export function SavedCards({
     });
   };
 
+  const move = (id: string, folderId: string | null) => {
+    start(async () => {
+      await moveSavedCard(id, folderId);
+      router.refresh();
+    });
+  };
+
   return (
     <div className="mt-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm opacity-70">
           {cards.length} tarjetas · {due.length} pendientes
         </p>
-        {due.length > 0 && (
-          <button
-            onClick={() => {
-              setSession(due); // snapshot the current due cards for this session
-              setMode("practice");
-              setIdx(0);
-              setRevealed(false);
-            }}
-            className="rounded-md bg-ink px-4 py-1.5 text-sm font-medium text-paper dark:bg-paper dark:text-ink"
-          >
-            Practicar ({due.length})
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {cards.length > 0 && (
+            <button
+              onClick={() => beginSession(cards)}
+              className="text-sm underline opacity-70 hover:opacity-100"
+            >
+              Repasar todas
+            </button>
+          )}
+          {due.length > 0 && (
+            <button
+              onClick={() => beginSession(due)}
+              className="rounded-md bg-ink px-4 py-1.5 text-sm font-medium text-paper dark:bg-paper dark:text-ink"
+            >
+              Practicar ({due.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {cards.length === 0 ? (
         <p className="mt-8 text-sm opacity-70">
-          Aún no has guardado nada. Usa «+ Guardar frase» en una conversación o
+          No hay tarjetas aquí. Usa «+ Guardar frase» en una conversación o
           «Guardar para practicar» en un informe.
         </p>
       ) : (
@@ -159,6 +197,19 @@ export function SavedCards({
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs opacity-45">{stateLabel(c.state)}</span>
+                <select
+                  value={c.folderId ?? ""}
+                  onChange={(e) => move(c.id, e.target.value || null)}
+                  className="max-w-32 rounded-md border border-black/15 bg-transparent px-1.5 py-1 text-xs opacity-70 hover:opacity-100 dark:border-white/20 dark:bg-ink"
+                  title="Mover a carpeta"
+                >
+                  <option value="">Sin carpeta</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => del(c.id)}
                   className="text-xs opacity-40 hover:opacity-100"

@@ -10,6 +10,7 @@ export async function addSavedCard(input: {
   phrase: string;
   meaning: string;
   note?: string;
+  folderId?: string | null;
   sourceConversationId?: string | null;
 }) {
   const phrase = input.phrase.trim();
@@ -20,12 +21,14 @@ export async function addSavedCard(input: {
     phrase,
     meaning,
     note: input.note?.trim() || null,
+    folderId: input.folderId ?? null,
     sourceConversationId: input.sourceConversationId ?? null,
     due: new Date(),
     state: 0,
     fsrs: newFsrsCard(),
   });
-  revalidatePath("/progress");
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
 }
 
 export async function reviewSavedCard(cardId: string, rating: DrillRating) {
@@ -49,7 +52,18 @@ export async function reviewSavedCard(cardId: string, rating: DrillRating) {
 
 export async function deleteSavedCard(cardId: string) {
   await getDb().delete(savedCards).where(eq(savedCards.id, cardId));
-  revalidatePath("/progress");
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
+}
+
+/** Move a card to a folder (null = unfiled). */
+export async function moveSavedCard(cardId: string, folderId: string | null) {
+  await getDb()
+    .update(savedCards)
+    .set({ folderId })
+    .where(eq(savedCards.id, cardId));
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
 }
 
 /** Turn a report issue into a saved practice card (correct version = the phrase). */
@@ -72,5 +86,6 @@ export async function saveIssueAsCard(issueId: string) {
     fsrs: newFsrsCard(),
   });
   revalidatePath(`/report/${issue.conversationId}`);
-  revalidatePath("/progress");
+  revalidatePath("/tarjetas");
+  revalidatePath("/");
 }

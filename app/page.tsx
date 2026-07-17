@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { topics, getTopic } from "@/content/topics";
 import { startConversation, startTensePractice } from "@/server/conversations";
-import { listRecentConversations } from "@/lib/db/queries";
+import {
+  listRecentConversations,
+  getFolders,
+  getFolderStats,
+} from "@/lib/db/queries";
 import { PRACTICE_TENSES, tenseLabel, isPracticeTense } from "@/lib/tense";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +20,25 @@ const cap = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
 
 export default async function HomePage() {
   let recent: Awaited<ReturnType<typeof listRecentConversations>> = [];
+  let folders: Awaited<ReturnType<typeof getFolders>> = [];
+  let stats: Awaited<ReturnType<typeof getFolderStats>> = [];
   let dbReady = true;
   try {
-    recent = await listRecentConversations(10);
+    [recent, folders, stats] = await Promise.all([
+      listRecentConversations(10),
+      getFolders(),
+      getFolderStats(),
+    ]);
   } catch {
     dbReady = false;
   }
+
+  const byFolder = new Map(stats.map((s) => [s.folderId, s]));
+  const totals = stats.reduce(
+    (acc, s) => ({ total: acc.total + s.total, due: acc.due + s.due }),
+    { total: 0, due: 0 },
+  );
+  const unfiled = byFolder.get(null);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
@@ -32,7 +49,7 @@ export default async function HomePage() {
             Habla en español de España y te corrijo sobre la marcha.
           </p>
         </div>
-        <Link href="/progress" className="mt-2 text-sm underline opacity-70">
+        <Link href="/tarjetas" className="mt-2 text-sm underline opacity-70">
           Tarjetas
         </Link>
       </div>
@@ -42,6 +59,63 @@ export default async function HomePage() {
           La base de datos no está configurada. Copia <code>.env.example</code> a{" "}
           <code>.env.local</code> y rellena <code>DATABASE_URL</code>.
         </p>
+      )}
+
+      {dbReady && totals.total > 0 && (
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium uppercase tracking-wide opacity-60">
+              Tus tarjetas
+            </h2>
+            <Link href="/tarjetas" className="text-xs underline opacity-60">
+              Ver carpetas
+            </Link>
+          </div>
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-black/10 px-4 py-3 dark:border-white/10">
+            <p className="text-sm opacity-70">
+              {totals.total} tarjetas · {totals.due} pendientes
+            </p>
+            {totals.due > 0 && (
+              <Link
+                href="/tarjetas/todas?practicar=1"
+                className="rounded-md bg-ink px-4 py-1.5 text-sm font-medium text-paper dark:bg-paper dark:text-ink"
+              >
+                Practicar ({totals.due})
+              </Link>
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {folders.map((f) => {
+              const s = byFolder.get(f.id);
+              if (!s || s.total === 0) return null;
+              return (
+                <Link
+                  key={f.id}
+                  href={`/tarjetas/${f.id}`}
+                  className="rounded-full border border-black/15 px-4 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+                >
+                  {f.name}
+                  {s.due > 0 && (
+                    <span className="ml-1.5 text-xs opacity-60">{s.due}</span>
+                  )}
+                </Link>
+              );
+            })}
+            {unfiled && unfiled.total > 0 && (
+              <Link
+                href="/tarjetas/sueltas"
+                className="rounded-full border border-dashed border-black/15 px-4 py-1.5 text-sm opacity-80 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+              >
+                Sin carpeta
+                {unfiled.due > 0 && (
+                  <span className="ml-1.5 text-xs opacity-60">
+                    {unfiled.due}
+                  </span>
+                )}
+              </Link>
+            )}
+          </div>
+        </section>
       )}
 
       <section className="mt-10">
