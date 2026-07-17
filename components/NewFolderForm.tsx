@@ -3,8 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createFolder } from "@/server/folders";
+import type { Language } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
-export function NewFolderForm() {
+export function NewFolderForm({ lang }: { lang: Language }) {
+  const t = ui(lang);
   const router = useRouter();
   const [name, setName] = useState("");
   const [pending, start] = useTransition();
@@ -12,7 +15,7 @@ export function NewFolderForm() {
   const create = () => {
     if (!name.trim()) return;
     start(async () => {
-      await createFolder(name);
+      await createFolder(lang, name);
       setName("");
       router.refresh();
     });
@@ -29,7 +32,7 @@ export function NewFolderForm() {
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Nueva carpeta (p. ej. Dichos)"
+        placeholder={t.newFolderPlaceholder}
         className="flex-1 rounded-md border border-black/15 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
       />
       <button
@@ -37,7 +40,7 @@ export function NewFolderForm() {
         disabled={pending || !name.trim()}
         className="rounded-md border border-black/15 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-white/20"
       >
-        Crear carpeta
+        {t.createFolder}
       </button>
     </form>
   );

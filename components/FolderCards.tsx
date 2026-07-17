@@ -8,6 +8,8 @@ import {
   moveSavedCard,
 } from "@/server/saved";
 import type { DrillRating } from "@/lib/srs";
+import type { Language } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
 export interface SavedCardView {
   id: string;
@@ -23,30 +25,22 @@ export interface FolderOption {
   name: string;
 }
 
-const RATINGS: { key: DrillRating; label: string }[] = [
-  { key: "again", label: "Otra vez" },
-  { key: "hard", label: "Difícil" },
-  { key: "good", label: "Bien" },
-  { key: "easy", label: "Fácil" },
-];
-
-function stateLabel(state: number): string {
-  if (state === 0) return "nueva";
-  if (state === 2) return "dominada";
-  return "aprendiendo";
-}
+const RATING_KEYS: DrillRating[] = ["again", "hard", "good", "easy"];
 
 export function FolderCards({
+  lang,
   cards,
   due,
   folders,
   autoStart = false,
 }: {
+  lang: Language;
   cards: SavedCardView[];
   due: SavedCardView[];
   folders: FolderOption[];
   autoStart?: boolean;
 }) {
+  const t = ui(lang);
   const router = useRouter();
   const startPractice = autoStart && due.length > 0;
   const [mode, setMode] = useState<"list" | "practice">(
@@ -54,12 +48,18 @@ export function FolderCards({
   );
   const [idx, setIdx] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  // Snapshot of the cards to review this session — fixed at "Practicar" time so
+  // Snapshot of the cards to review this session — fixed at practice-start so
   // it never shifts as reviews reschedule cards underneath us.
   const [session, setSession] = useState<SavedCardView[]>(
     startPractice ? due : [],
   );
   const [, start] = useTransition();
+
+  const stateLabel = (state: number): string => {
+    if (state === 0) return t.stateNew;
+    if (state === 2) return t.stateMastered;
+    return t.stateLearning;
+  };
 
   const beginSession = (deck: SavedCardView[]) => {
     setSession(deck);
@@ -73,7 +73,7 @@ export function FolderCards({
     if (idx >= session.length) {
       return (
         <div className="mt-12 text-center">
-          <p className="text-lg">¡Repaso terminado! 🎉</p>
+          <p className="text-lg">{t.sessionDone}</p>
           <button
             onClick={() => {
               setMode("list");
@@ -83,7 +83,7 @@ export function FolderCards({
             }}
             className="mt-4 text-sm underline opacity-70"
           >
-            Volver
+            {t.back}
           </button>
         </div>
       );
@@ -119,17 +119,17 @@ export function FolderCards({
             onClick={() => setRevealed(true)}
             className="mt-4 w-full rounded-md bg-ink py-2.5 text-sm font-medium text-paper dark:bg-paper dark:text-ink"
           >
-            Mostrar respuesta
+            {t.showAnswer}
           </button>
         ) : (
           <div className="mt-4 grid grid-cols-4 gap-2">
-            {RATINGS.map((r) => (
+            {RATING_KEYS.map((key) => (
               <button
-                key={r.key}
-                onClick={() => rate(r.key)}
+                key={key}
+                onClick={() => rate(key)}
                 className="rounded-md border border-black/15 py-2.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
               >
-                {r.label}
+                {t.ratings[key]}
               </button>
             ))}
           </div>
@@ -157,7 +157,7 @@ export function FolderCards({
     <div className="mt-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm opacity-70">
-          {cards.length} tarjetas · {due.length} pendientes
+          {t.cardsDueLine(cards.length, due.length)}
         </p>
         <div className="flex items-center gap-3">
           {cards.length > 0 && (
@@ -165,7 +165,7 @@ export function FolderCards({
               onClick={() => beginSession(cards)}
               className="text-sm underline opacity-70 hover:opacity-100"
             >
-              Repasar todas
+              {t.reviewAll}
             </button>
           )}
           {due.length > 0 && (
@@ -173,17 +173,14 @@ export function FolderCards({
               onClick={() => beginSession(due)}
               className="rounded-md bg-ink px-4 py-1.5 text-sm font-medium text-paper dark:bg-paper dark:text-ink"
             >
-              Practicar ({due.length})
+              {t.practiceN(due.length)}
             </button>
           )}
         </div>
       </div>
 
       {cards.length === 0 ? (
-        <p className="mt-8 text-sm opacity-70">
-          No hay tarjetas aquí. Usa «+ Guardar frase» en una conversación o
-          «Guardar para practicar» en un informe.
-        </p>
+        <p className="mt-8 text-sm opacity-70">{t.emptyFolder}</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {cards.map((c) => (
@@ -201,9 +198,9 @@ export function FolderCards({
                   value={c.folderId ?? ""}
                   onChange={(e) => move(c.id, e.target.value || null)}
                   className="max-w-32 rounded-md border border-black/15 bg-transparent px-1.5 py-1 text-xs opacity-70 hover:opacity-100 dark:border-white/20 dark:bg-ink"
-                  title="Mover a carpeta"
+                  title={t.moveToFolder}
                 >
-                  <option value="">Sin carpeta</option>
+                  <option value="">{t.noFolder}</option>
                   {folders.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
@@ -213,7 +210,7 @@ export function FolderCards({
                 <button
                   onClick={() => del(c.id)}
                   className="text-xs opacity-40 hover:opacity-100"
-                  title="Eliminar"
+                  title={t.delete}
                 >
                   ✕
                 </button>

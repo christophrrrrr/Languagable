@@ -3,16 +3,21 @@
 import { useState, useTransition } from "react";
 import { addSavedCard } from "@/server/saved";
 import { listFolders, createFolder } from "@/server/folders";
+import type { Language } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
 const NEW_FOLDER = "__new__";
 
 export function AddCardButton({
+  lang,
   defaultPhrase,
   conversationId,
 }: {
+  lang: Language;
   defaultPhrase: string;
   conversationId: string;
 }) {
+  const t = ui(lang);
   const [open, setOpen] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [meaning, setMeaning] = useState("");
@@ -29,7 +34,7 @@ export function AddCardButton({
     setNote("");
     setNewFolderName("");
     setOpen(true);
-    void listFolders()
+    void listFolders(lang)
       .then((rows) => setFolders(rows.map((f) => ({ id: f.id, name: f.name }))))
       .catch(() => setFolders([]));
   };
@@ -40,7 +45,7 @@ export function AddCardButton({
       let targetFolderId: string | null = folderId || null;
       if (folderId === NEW_FOLDER) {
         const created = newFolderName.trim()
-          ? await createFolder(newFolderName)
+          ? await createFolder(lang, newFolderName)
           : null;
         targetFolderId = created?.id ?? null;
       }
@@ -64,41 +69,41 @@ export function AddCardButton({
         onClick={() => (open ? setOpen(false) : openPanel())}
         className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
       >
-        {savedFlash ? "Guardada ✓" : "+ Guardar frase"}
+        {savedFlash ? t.savedFlash : t.savePhrase}
       </button>
 
       {open && (
         <div className="absolute right-0 z-10 mt-2 w-80 rounded-lg border border-black/15 bg-paper p-3 shadow-lg dark:border-white/20 dark:bg-ink">
-          <label className="block text-xs opacity-60">Frase o expresión</label>
+          <label className="block text-xs opacity-60">{t.phraseLabel}</label>
           <textarea
             value={phrase}
             onChange={(e) => setPhrase(e.target.value)}
             rows={2}
             className="mt-1 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20"
-            placeholder="ir viento en popa"
+            placeholder={t.phrasePlaceholder}
           />
           <label className="mt-2 block text-xs opacity-60">
-            Significado / pista
+            {t.meaningLabel}
           </label>
           <input
             value={meaning}
             onChange={(e) => setMeaning(e.target.value)}
             className="mt-1 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20"
-            placeholder="ir muy bien, sobre ruedas"
+            placeholder={t.meaningPlaceholder}
           />
-          <label className="mt-2 block text-xs opacity-60">Carpeta</label>
+          <label className="mt-2 block text-xs opacity-60">{t.folderLabel}</label>
           <select
             value={folderId}
             onChange={(e) => setFolderId(e.target.value)}
             className="mt-1 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-ink"
           >
-            <option value="">Sin carpeta</option>
+            <option value="">{t.noFolder}</option>
             {folders.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
               </option>
             ))}
-            <option value={NEW_FOLDER}>+ Nueva carpeta…</option>
+            <option value={NEW_FOLDER}>{t.newFolderOption}</option>
           </select>
           {folderId === NEW_FOLDER && (
             <input
@@ -106,10 +111,10 @@ export function AddCardButton({
               onChange={(e) => setNewFolderName(e.target.value)}
               autoFocus
               className="mt-1.5 w-full rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-black/40 dark:border-white/20"
-              placeholder="Nombre de la carpeta"
+              placeholder={t.folderNamePlaceholder}
             />
           )}
-          <label className="mt-2 block text-xs opacity-60">Nota (opcional)</label>
+          <label className="mt-2 block text-xs opacity-60">{t.noteLabel}</label>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -122,7 +127,7 @@ export function AddCardButton({
               onClick={() => setOpen(false)}
               className="rounded-md px-2.5 py-1 text-xs opacity-70 hover:opacity-100"
             >
-              Cancelar
+              {t.cancel}
             </button>
             <button
               type="button"
@@ -130,7 +135,7 @@ export function AddCardButton({
               disabled={pending || !phrase.trim() || !meaning.trim()}
               className="rounded-md bg-ink px-2.5 py-1 text-xs font-medium text-paper disabled:opacity-40 dark:bg-paper dark:text-ink"
             >
-              Guardar
+              {t.save}
             </button>
           </div>
         </div>

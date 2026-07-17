@@ -4,18 +4,23 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { renameFolder, deleteFolder } from "@/server/folders";
+import type { Language } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
 export function FolderTile({
+  lang,
   id,
   name,
   total,
   due,
 }: {
+  lang: Language;
   id: string;
   name: string;
   total: number;
   due: number;
 }) {
+  const t = ui(lang);
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -36,8 +41,7 @@ export function FolderTile({
   };
 
   const remove = () => {
-    if (!confirm(`¿Eliminar la carpeta «${name}»? Sus tarjetas no se borran.`))
-      return;
+    if (!confirm(t.deleteFolderConfirm(name))) return;
     start(async () => {
       await deleteFolder(id);
       router.refresh();
@@ -67,7 +71,7 @@ export function FolderTile({
               disabled={pending}
               className="rounded-md bg-ink px-2.5 py-1 text-xs font-medium text-paper disabled:opacity-40 dark:bg-paper dark:text-ink"
             >
-              Guardar
+              {t.save}
             </button>
             <button
               onClick={() => {
@@ -76,19 +80,19 @@ export function FolderTile({
               }}
               className="rounded-md px-2 py-1 text-xs opacity-70 hover:opacity-100"
             >
-              Cancelar
+              {t.cancel}
             </button>
           </div>
         </div>
       ) : (
         <>
-          <Link href={`/tarjetas/${id}`} className="block">
+          <Link href={`/${lang}/tarjetas/${id}`} className="block">
             <div className="text-base font-medium">{name}</div>
             <div className="mt-1 text-xs opacity-60">
-              {total} tarjetas
+              {t.nCards(total)}
               {due > 0 && (
                 <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-paper dark:bg-paper dark:text-ink">
-                  {due} pendientes
+                  {t.dueBadge(due)}
                 </span>
               )}
             </div>
@@ -97,7 +101,7 @@ export function FolderTile({
             <button
               onClick={() => setEditing(true)}
               className="text-xs opacity-50 hover:opacity-100"
-              title="Renombrar"
+              title={t.rename}
             >
               ✎
             </button>
@@ -105,7 +109,7 @@ export function FolderTile({
               onClick={remove}
               disabled={pending}
               className="text-xs opacity-50 hover:opacity-100"
-              title="Eliminar carpeta"
+              title={t.deleteFolderTitle}
             >
               ✕
             </button>

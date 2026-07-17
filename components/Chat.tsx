@@ -4,18 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { finishAndAnalyze } from "@/server/conversations";
 import { AddCardButton } from "@/components/AddCardButton";
 import { FinishButton } from "@/components/FinishButton";
+import type { Language } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export function Chat({
+  lang,
   conversationId,
   topicLabel,
   initialMessages,
 }: {
+  lang: Language;
   conversationId: string;
   topicLabel: string | null;
   initialMessages: ChatMessage[];
 }) {
+  const t = ui(lang);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -52,7 +57,7 @@ export function Chat({
         body: JSON.stringify({ conversationId, content: opening ? "" : userText }),
       });
       if (!res.ok || !res.body) {
-        throw new Error((await res.text().catch(() => "")) || "Sin respuesta");
+        throw new Error((await res.text().catch(() => "")) || t.connectionError);
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -68,12 +73,12 @@ export function Chat({
         });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error de conexión");
+      setError(e instanceof Error ? e.message : t.connectionError);
       setMessages((prev) => {
         const copy = prev.slice();
         copy[copy.length - 1] = {
           role: "assistant",
-          content: "⚠️ No se pudo obtener respuesta.",
+          content: t.noAnswer,
         };
         return copy;
       });
@@ -98,17 +103,22 @@ export function Chat({
     <div className="mx-auto flex h-dvh max-w-2xl flex-col px-4">
       <header className="flex items-center justify-between border-b border-black/10 py-3 dark:border-white/10">
         <div>
-          <div className="text-sm font-medium">Conversación</div>
-          <div className="text-xs opacity-60">{topicLabel ?? "Charla libre"}</div>
+          <div className="text-sm font-medium">{t.conversationTitle}</div>
+          <div className="text-xs opacity-60">{topicLabel ?? t.freeChat}</div>
         </div>
         <div className="flex items-center gap-2">
           <AddCardButton
+            lang={lang}
             defaultPhrase={lastAssistant}
             conversationId={conversationId}
           />
           <form action={finishAndAnalyze}>
             <input type="hidden" name="conversationId" value={conversationId} />
-            <FinishButton disabled={streaming || userTurns === 0} />
+            <FinishButton
+              disabled={streaming || userTurns === 0}
+              label={t.finishAnalyze}
+              pendingLabel={t.analyzing}
+            />
           </form>
         </div>
       </header>
@@ -148,7 +158,7 @@ export function Chat({
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribe en español…"
+          placeholder={t.inputPlaceholder}
           className="flex-1 rounded-md border border-black/15 bg-transparent px-3 py-2 outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50"
         />
         <button
@@ -156,7 +166,7 @@ export function Chat({
           disabled={streaming || input.trim() === ""}
           className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium disabled:opacity-40 dark:border-white/20"
         >
-          Enviar
+          {t.send}
         </button>
       </form>
     </div>
