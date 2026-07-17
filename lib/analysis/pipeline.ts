@@ -2,6 +2,7 @@ import type { Dimension } from "@/content/concepts";
 import { resolveConceptSlug } from "@/content/concepts";
 import { runDetectors } from "@/lib/detectors";
 import { analyzeConversation } from "@/lib/ai/analysis";
+import type { Language } from "@/lib/lang";
 
 export interface PipelineMessage {
   id: string;
@@ -45,16 +46,20 @@ const clamp = (n: number, lo: number, hi: number) =>
  * conversation, then merges them: detector findings win on overlap, and LLM
  * findings that duplicate a detector span (same message + same text) are
  * dropped. The result is a flat list ready to persist as `issues`.
+ *
+ * The deterministic detectors are Spanish-specific; for other languages the
+ * pipeline is LLM-only.
  */
 export async function runAnalysisPipeline(
+  lang: Language,
   messages: PipelineMessage[],
 ): Promise<PipelineResult> {
   const learner = messages.filter((m) => m.role === "user");
   const indexToId = new Map(messages.map((m) => [m.index, m.id]));
 
-  // 1. Deterministic detectors on each learner message.
+  // 1. Deterministic detectors on each learner message (Spanish only).
   const detectorIssues: PreparedIssue[] = [];
-  for (const msg of learner) {
+  for (const msg of lang === "es" ? learner : []) {
     for (const match of runDetectors(msg.content)) {
       detectorIssues.push({
         messageId: msg.id,
@@ -81,6 +86,7 @@ export async function runAnalysisPipeline(
   const llmIssues: PreparedIssue[] = [];
   try {
     const result = await analyzeConversation(
+      lang,
       messages.map((m) => ({ index: m.index, role: m.role, content: m.content })),
     );
     strengths = result.strengths;

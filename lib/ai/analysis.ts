@@ -1,4 +1,5 @@
 import { generateObject } from "ai";
+import type { Language } from "@/lib/lang";
 import { analysisModel } from "./provider";
 import { analysisSystemPrompt } from "./prompts";
 import { analysisResultSchema, type AnalysisResult } from "./schemas";
@@ -15,20 +16,21 @@ export interface TranscriptMessage {
  * here is trusted yet — the pipeline merges/dedupes and gates on confidence.
  */
 export async function analyzeConversation(
+  lang: Language,
   messages: TranscriptMessage[],
 ): Promise<AnalysisResult> {
   const transcript = messages
     .map(
       (m) =>
-        `[#${m.index}] ${m.role === "user" ? "APRENDIZ" : "AMIGO"}: ${m.content}`,
+        `[#${m.index}] ${m.role === "user" ? "LEARNER" : "PARTNER"}: ${m.content}`,
     )
     .join("\n");
 
   const { object } = await generateObject({
     model: analysisModel(),
     schema: analysisResultSchema,
-    system: analysisSystemPrompt(),
-    prompt: `Analyse ONLY the APRENDIZ messages in this transcript.\n\n${transcript}`,
+    system: analysisSystemPrompt(lang),
+    prompt: `Analyse ONLY the LEARNER messages in this transcript.\n\n${transcript}`,
     // Cap latency: the analysis is a blocking step in "Terminar y analizar".
     abortSignal: AbortSignal.timeout(50_000),
     // Gemini 2.5-flash "thinks" by default (~40s here); disable it for this
