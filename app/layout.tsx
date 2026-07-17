@@ -4,7 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Languagable",
-  description: "Refine your Peninsular Spanish through real conversation.",
+  description:
+    "Refine your Spanish, French or Portuguese through real conversation.",
 };
 
 export default function RootLayout({

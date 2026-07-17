@@ -7,6 +7,8 @@ import {
   getDueSavedCards,
 } from "@/lib/db/queries";
 import { FolderCards, type SavedCardView } from "@/components/FolderCards";
+import { isLanguage } from "@/lib/lang";
+import { ui } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +26,12 @@ export default async function FolderPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ folder: string }>;
+  params: Promise<{ lang: string; folder: string }>;
   searchParams: Promise<{ practicar?: string }>;
 }) {
-  const { folder: slug } = await params;
+  const { lang, folder: slug } = await params;
+  if (!isLanguage(lang)) notFound();
+  const t = ui(lang);
   const { practicar } = await searchParams;
 
   // "todas" = all cards, "sueltas" = unfiled, otherwise a folder id.
@@ -36,37 +40,38 @@ export default async function FolderPage({
   let subtitle: string;
   if (slug === "todas") {
     scope = undefined;
-    title = "Todas las tarjetas";
-    subtitle = "Todo lo que has guardado, de todas las carpetas.";
+    title = t.allCards;
+    subtitle = t.allSub;
   } else if (slug === "sueltas") {
     scope = null;
-    title = "Sin carpeta";
-    subtitle = "Tarjetas que aún no has metido en ninguna carpeta.";
+    title = t.noFolder;
+    subtitle = t.unfiledSub;
   } else {
     const folder = await getFolder(slug).catch(() => null);
-    if (!folder) notFound();
+    if (!folder || folder.language !== lang) notFound();
     scope = folder.id;
     title = folder.name;
-    subtitle = "Solo las tarjetas de esta carpeta.";
+    subtitle = t.folderSub;
   }
 
   const [all, due, folders] = await Promise.all([
-    getSavedCards(scope),
-    getDueSavedCards(new Date(), scope),
-    getFolders(),
+    getSavedCards(lang, scope),
+    getDueSavedCards(lang, new Date(), scope),
+    getFolders(lang),
   ]);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <Link href="/tarjetas" className="text-sm underline opacity-70">
-          Carpetas
+        <Link href={`/${lang}/tarjetas`} className="text-sm underline opacity-70">
+          {t.foldersLink}
         </Link>
       </div>
       <p className="mt-1 text-sm opacity-70">{subtitle}</p>
 
       <FolderCards
+        lang={lang}
         cards={all.map(toView)}
         due={due.map(toView)}
         folders={folders.map((f) => ({ id: f.id, name: f.name }))}
