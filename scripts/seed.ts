@@ -1,8 +1,9 @@
-// Seeds the concept taxonomy (content-as-code) and starter card folders.
-// Run with: npm run seed
-import { concepts as conceptSeed } from "../content/concepts";
+// Seeds the concept taxonomies (content-as-code) and starter card folders
+// for every language. Run with: npm run seed
+import { allConcepts } from "../content/concepts";
 import { getDb } from "../lib/db/client";
 import { concepts as conceptsTable, folders } from "../lib/db/schema";
+import type { Language } from "../lib/lang";
 
 for (const file of [".env.local", ".env"]) {
   try {
@@ -12,9 +13,15 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
+const STARTER_FOLDERS: Record<Language, string[]> = {
+  es: ["Dichos", "Vocabulario", "Expresiones"],
+  fr: ["Dictons", "Vocabulaire", "Expressions"],
+  pt: ["Ditados", "Vocabulário", "Expressões"],
+};
+
 async function main() {
   const db = getDb();
-  for (const c of conceptSeed) {
+  for (const c of allConcepts) {
     await db
       .insert(conceptsTable)
       .values({
@@ -34,16 +41,19 @@ async function main() {
         },
       });
   }
-  console.log(`Seeded ${conceptSeed.length} concepts.`);
+  console.log(`Seeded ${allConcepts.length} concepts.`);
 
-  const starterFolders = ["Dichos", "Vocabulario", "Expresiones"];
-  for (const name of starterFolders) {
-    await db
-      .insert(folders)
-      .values({ name })
-      .onConflictDoNothing({ target: folders.name });
+  let folderCount = 0;
+  for (const [language, names] of Object.entries(STARTER_FOLDERS)) {
+    for (const name of names) {
+      await db
+        .insert(folders)
+        .values({ language, name })
+        .onConflictDoNothing({ target: [folders.language, folders.name] });
+      folderCount++;
+    }
   }
-  console.log(`Seeded ${starterFolders.length} starter folders.`);
+  console.log(`Seeded ${folderCount} starter folders.`);
 }
 
 main()
